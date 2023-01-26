@@ -68,5 +68,19 @@ export class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Base URL")
+			.setDesc("Your base URL e.g: /ghost")
+			.addText((text) =>
+				text
+					.setPlaceholder("/ghost")
+					.setValue(this.plugin.settings.baseURL)
+					.onChange(async (value) => {
+						console.log("Base URL: " + value);
+						this.plugin.settings.baseURL = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }

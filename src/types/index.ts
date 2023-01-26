@@ -1,6 +1,7 @@
 export interface SettingsProp {
 	url: string;
 	adminToken: string;
+	baseURL: string;
 }
 
 export const DEFAULT_SETTINGS: SettingsProp = {
