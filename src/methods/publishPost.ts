@@ -13,12 +13,14 @@ import {
 import { sign } from "jsonwebtoken";
 import { readFileSync } from "fs";
 
+const md_footnote = require("markdown-it-footnote");
 const matter = require("gray-matter");
-const MarkdownIt = require("markdown-it");
+const MarkdownIt = require("markdown-it")
+
 
 const md = new MarkdownIt({
 	html: true,
-});
+}).use(md_footnote);
 const version = "v4";
 
 const contentPost = (frontmatter: ContentProp, data: DataProp) => ({
@@ -29,6 +31,14 @@ const contentPost = (frontmatter: ContentProp, data: DataProp) => ({
 		},
 	],
 });
+
+const openInBrowser = (url: string) => {
+	const a = document.createElement("a");
+	a.href = url;
+	a.target = "_blank";
+	a.rel = "noopener noreferrer";
+	a.click();
+};
 
 export const publishPost = async (
 	view: MarkdownView,
@@ -59,16 +69,32 @@ export const publishPost = async (
 		status: metaMatter?.published ? "published" : "draft",
 		excerpt: metaMatter?.excerpt || undefined,
 		feature_image: metaMatter?.feature_image || undefined,
+		updated_at: metaMatter?.updated_at || undefined,
+		"date modified": metaMatter["date modified"] || undefined,
 	};
 
 	const BASE_URL = settings.baseURL;
 
 	// convert [[link]] to <a href="BASE_URL/id" class="link-previews">Internal Micro</a>for Ghost
 	const content = data.content.replace(
-		/\[\[(.*?)\]\]/g,
+		/!*\[\[(.*?)\]\]/g,
 		(match: any, p1: string) => {
-			if (p1.includes(".png")) {
-				return `![${p1}](${BASE_URL}/${p1})`;
+			if (p1.toLowerCase().includes(".png") || p1.toLowerCase().includes(".jpg") || p1.toLowerCase().includes(".jpeg") || p1.toLowerCase().includes(".gif")) {
+				try {
+					console.log("match ", p1);
+					// get the year
+					const year = new Date().getFullYear();
+					// get the month
+					const monthNum = new Date().getMonth() + 1;
+					let month = monthNum.toString();
+					if (monthNum < 10) {
+						month = `0${monthNum}`;
+					}
+
+					return `<figure class="kg-card kg-image-card"><img src="${BASE_URL}/content/images/${year}/${month}/${p1.replace(/ /g, "-").replace(/%20/g, "-")}" alt="${BASE_URL}/content/images/${year}/${month}/${p1.replace(/ /g, "-").replace(/%20/g, "-")}"></img><figcaption>${p1}</figcaption></figure>`;
+				} catch (err) {
+					console.log("is404Req", err);
+				}
 			}
 
 			const [link, text] = p1.split("|");
@@ -79,155 +105,106 @@ export const publishPost = async (
 			return linkHTML;
 		}
 	);
+
 	data.content = content;
 
-	// remove the first h1
-	// const contentWithoutH1 = data.content.replace(/^#.*$/gm, "");
-	// data.content = contentWithoutH1;
+	// remove the first h1 (# -> \n) in the content
+	data.content = data.content.replace(/#.*\n/, "");
 
-	console.log(contentPost(frontmatter, data));
+	/* example of youtube embed
+<iframe width="560" height="315" src="https://www.youtube.com/embed/FQ5YU_spBw0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+	*/
+
+	// convert youtube embeds to ghost embeds
+	data.content = data.content.replace(
+		/<iframe.*src="https:\/\/www.youtube.com\/embed\/(.*?)".*<\/iframe>/g,
+		(match: any, p1: string) => {
+			return `<figure class="kg-card kg-embed-card"><div class="kg-embed-card"><iframe width="560" height="315" src="https://www.youtube.com/embed/${p1}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div></figure>`;
+		}
+	);
 
 	// use the ghosts admin /post api to see if post with slug exists
-	// const result = await request({
-	// 	url: `${settings.url}/ghost/api/${version}/admin/posts/?source=html&filter=slug:${frontmatter.slug}`,
-	// 	method: "GET",
-	// 	contentType: "application/json",
-	// 	headers: {
-	// 		"Access-Control-Allow-Methods": "GET",
-	// 		"Content-Type": "application/json;charset=utf-8",
-	// 		Authorization: `Ghost ${token}`,
-	// 	},
-	// });
-
-	// const json = JSON.parse(result);
-	// console.log(json)
-
-	// fetch image from path
-	const path = "ultra.png";
-	// read file from path using fs
-	const image = readFileSync(path);
-
-	// create blob from image
-	const blob = new Blob([image], { type: "image/png" });
-
-	const file = new File([blob], "ultra.png", { type: "image/png" });
-	console.log(file);
-
-	// log links in CachedMetadata
-	// const links = app.metadataCache.getFileCache(noteFile).embeds
-	// console.log(links)
-
-	// use getFirstLinkpathDest to get the path of the link
-	const shortpath =
-		"last of us smart one 1 Screenshot 2023-01-15 23-28-54.png";
-	const link = app.metadataCache.getFirstLinkpathDest(
-		shortpath,
-		noteFile.path
-	);
-	console.log(link); // <- this works
-
-	// const blob = await image.blob();
-	// const file = new File([blob], "ultra.png", { type: "image/png" });
-
-	// upload image to ghost
-	const formData = new FormData();
-	formData.append("file", file);
-	formData.append("ref", "ultra.png");
-	formData.append("purpose", "image");
-
-	
-
-	// https://stackoverflow.com/questions/74276173/how-to-send-multipart-form-data-payload-with-typescript-obsidian-library
-	const N = 16; // The length of our random boundry string
-	const randomBoundryString =
-		"djmangoBoundry" +
-		Array(N + 1)
-			.join(
-				(Math.random().toString(36) + "00000000000000000").slice(2, 18)
-			)
-			.slice(0, N);
-
-	// Construct the form data payload as a string
-	const pre_string = `------${randomBoundryString}\r\nContent-Disposition: form-data; name="image_file"; filename="blob"\r\nContent-Type: "application/octet-stream"\r\n\r\n`;
-	const post_string = `\r\n------${randomBoundryString}--`;
-
-	// Convert the form data payload to a blob by concatenating the pre_string, the file data, and the post_string, and then return the blob as an array buffer
-	const pre_string_encoded = new TextEncoder().encode(pre_string);
-	const datab = new Blob([
-		await app.vault.adapter.readBinary("Attachments/ultra.png"),
-	]);
-	const post_string_encoded = new TextEncoder().encode(post_string);
-	const concatenated = await new Blob([
-		pre_string_encoded,
-		await datab.arrayBuffer(),
-		post_string_encoded,
-	]).arrayBuffer();
-
-
-	// Now that we have the form data payload as an array buffer, we can pass it to requestURL
-	// We also need to set the content type to multipart/form-data and pass in the boundry string
-	const options: RequestUrlParam = {
-		method: "POST",
-		url: `${settings.url}/ghost/api/admin/images/upload/`,
-		contentType: `multipart/form-data; boundary=----${randomBoundryString}`,
-		body: concatenated,
+	const slugExistsRes = await request({
+		url: `${settings.url}/ghost/api/${version}/admin/posts/?source=html&filter=slug:${frontmatter.slug}`,
+		method: "GET",
+		contentType: "application/json",
 		headers: {
-			"Content-Type": "multipart/form-data",
+			"Access-Control-Allow-Methods": "GET",
+			"Content-Type": "application/json;charset=utf-8",
 			Authorization: `Ghost ${token}`,
-			"Accept-Version": `${version}`,
 		},
-	};
+	});
 
-	console.log(token)
+	const slugExists = JSON.parse(slugExistsRes).posts.length > 0;
 
-	requestUrl(options)
-		.then((response) => {
-			console.log(response);
-		})
-		.catch((error) => {
-			console.log("something went wrong")
-			console.error(error.message);
+	if (slugExists) {
+		// get id of post if it exists
+		const id = JSON.parse(slugExistsRes).posts[0].id;
+		console.log("slug exists -- updating post:" + id);
+
+		// add updated_at iso string to frontmatter
+		frontmatter.updated_at = JSON.parse(slugExistsRes).posts[0].updated_at;
+		
+		console.log(contentPost(frontmatter, data));
+
+
+
+		// if slug exists, update the post
+		const result = await request({
+			url: `${settings.url}/ghost/api/${version}/admin/posts/${id}/?source=html`,
+			method: "PUT",
+			contentType: "application/json",
+			headers: {
+				"Access-Control-Allow-Methods": "PUT",
+				"Content-Type": "application/json;charset=utf-8",
+				Authorization: `Ghost ${token}`,
+			},
+			body: JSON.stringify(contentPost(frontmatter, data)),
 		});
 
-	// upload an image from a file path in obsidian to the ghost content api
-	// example curl curl -X POST -F 'file=@/path/to/images/my-image.jpg' -F 'ref=path/to/images/my-image.jpg' -H "Authorization: 'Ghost $token'" -H "Accept-Version: $version" https://{admin_domain}/ghost/api/admin/images/upload/
+		console.log(result)
 
-	// const result = await request({
-	// 	url: `${settings.url}/ghost/api/${version}/admin/images/upload/`,
-	// 	method: "POST",
-	// 	contentType: "multipart/form-data",
-	// 	headers: {
-	// 		"Access-Control-Allow-Methods": "POST",
-	// 		"Content-Type": "multipart/form-data",
-	// 		Authorization: `Ghost ${token}`,
-	// 	},
-	// 	body: JSON.stringify(contentPost(frontmatter, data)),
-	// });
+		const json = JSON.parse(result);
 
-	// const result = await request({
-	// 	url: `${settings.url}/ghost/api/${version}/admin/posts/?source=html`,
-	// 	method: "POST",
-	// 	contentType: "application/json",
-	// 	headers: {
-	// 		"Access-Control-Allow-Methods": "POST",
-	// 		"Content-Type": "application/json;charset=utf-8",
-	// 		Authorization: `Ghost ${token}`,
-	// 	},
-	// 	body: JSON.stringify(contentPost(frontmatter, data)),
-	// });
+		if (json?.posts) {
+			new Notice(
+				`"${json?.posts?.[0]?.title}" update has been ${json?.posts?.[0]?.status} successful!`
+			);
+			// https://bram-adams.ghost.io/ghost/#/editor/post/63d3246b7932ae003df67c64
+			openInBrowser(`${settings.url}/ghost/#/editor/post/${json?.posts?.[0]?.id}`);
+		} else {
+			console.log(`${json.errors[0]?.details[0].message} - ${json.errors[0]?.details[0].params.allowedValues}`)
+			console.log(`${json.errors[0].context || json.errors[0].message}`)
+		}
 
-	// const json = JSON.parse(result);
+	} else {
+		// upload post
+		const result = await request({
+			url: `${settings.url}/ghost/api/${version}/admin/posts/?source=html`,
+			method: "POST",
+			contentType: "application/json",
+			headers: {
+				"Access-Control-Allow-Methods": "POST",
+				"Content-Type": "application/json;charset=utf-8",
+				Authorization: `Ghost ${token}`,
+			},
+			body: JSON.stringify(contentPost(frontmatter, data)),
+		});
 
-	// if (json?.posts) {
-	// 	new Notice(
-	// 		`"${json?.posts?.[0]?.title}" has been ${json?.posts?.[0]?.status} successful!`
-	// 	);
-	// } else {
-	// 	new Notice(`${json.errors[0].context || json.errors[0].message}`);
-	// 	new Notice(
-	// 		`${json.errors[0]?.details[0].message} - ${json.errors[0]?.details[0].params.allowedValues}`
-	// 	);
-	// }
+		const json = JSON.parse(result);
 
-	// return json;
+		if (json?.posts) {
+			new Notice(
+				`"${json?.posts?.[0]?.title}" has been ${json?.posts?.[0]?.status} successful!`
+			);
+			openInBrowser(`${settings.url}/ghost/#/editor/post/${json?.posts?.[0]?.id}`);
+		} else {
+			new Notice(`${json.errors[0].context || json.errors[0].message}`);
+			new Notice(
+				`${json.errors[0]?.details[0].message} - ${json.errors[0]?.details[0].params.allowedValues}`
+			);
+		}
+
+		return json;
+	}
 };
