@@ -11,7 +11,6 @@ import {
 	RequestUrlParam
 } from "obsidian";
 import { sign } from "jsonwebtoken";
-import { readFileSync } from "fs";
 
 const md_footnote = require("markdown-it-footnote");
 const matter = require("gray-matter");
@@ -39,6 +38,7 @@ const openInBrowser = (url: string) => {
 	a.rel = "noopener noreferrer";
 	a.click();
 };
+
 
 export const publishPost = async (
 	view: MarkdownView,
@@ -111,10 +111,6 @@ export const publishPost = async (
 	// remove the first h1 (# -> \n) in the content
 	data.content = data.content.replace(/#.*\n/, "");
 
-	/* example of youtube embed
-<iframe width="560" height="315" src="https://www.youtube.com/embed/FQ5YU_spBw0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-	*/
-
 	// convert youtube embeds to ghost embeds
 	data.content = data.content.replace(
 		/<iframe.*src="https:\/\/www.youtube.com\/embed\/(.*?)".*<\/iframe>/g,
@@ -122,6 +118,40 @@ export const publishPost = async (
 			return `<figure class="kg-card kg-embed-card"><div class="kg-embed-card"><iframe width="560" height="315" src="https://www.youtube.com/embed/${p1}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div></figure>`;
 		}
 	);
+
+
+	/*
+> Everyone should have to bear the psychic damage I did when I saw this video https://t.co/EELaLfM6Wx https://t.co/TNNDTj0AHV ([View Tweet](https://twitter.com/Money__Doug/status/1620546196560551936))
+	*/
+
+	// take the url from view tweet format and replace the entire blockquote with a tweet embed iframe
+
+
+	// add a new line before every ([View Tweet]
+	data.content = data.content.replace(/\(\[View Tweet\]/gm, "\n([View Tweet]");
+
+
+	data.content = data.content.replace(
+		/(^>.*\n.*)*\(https:\/\/twitter.com\/(.*)\/status\/(\d+)\)\)/gm,
+		(match: any, p1: string, p2: string, p3: string) => {
+			console.log("p1", p1);
+			console.log("p2", p2);
+
+
+			const url = `https://twitter.com/${p2}/status/${p3}?ref_src=twsrc%5Etfw`;
+			return `<figure class="kg-card kg-embed-card"><div class="twitter-tweet twitter-tweet-rendered"><iframe src="${url}" width="550" height="550" frameborder="0" scrolling="no" allowfullscreen="true" style="border: none; max-width: 100%; min-width: 100%;"></iframe></div></figure>`;
+		}
+	)
+
+
+	
+
+
+		
+
+	/*
+   >\s([\s\S]*?)\((\[View Tweet\]\(https:\/\/twitter.com\/.*?\/status\/.*?\))\)
+	*/
 
 	// use the ghosts admin /post api to see if post with slug exists
 	const slugExistsRes = await request({
