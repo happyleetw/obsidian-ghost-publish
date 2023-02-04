@@ -120,16 +120,9 @@ export const publishPost = async (
 	);
 
 
-	/*
-> Everyone should have to bear the psychic damage I did when I saw this video https://t.co/EELaLfM6Wx https://t.co/TNNDTj0AHV ([View Tweet](https://twitter.com/Money__Doug/status/1620546196560551936))
-	*/
-
 	// take the url from view tweet format and replace the entire blockquote with a tweet embed iframe
-
-
 	// add a new line before every ([View Tweet]
 	data.content = data.content.replace(/\(\[View Tweet\]/gm, "\n([View Tweet]");
-
 
 	data.content = data.content.replace(
 		/(^>.*\n.*)*\(https:\/\/twitter.com\/(.*)\/status\/(\d+)\)\)/gm,
@@ -142,16 +135,6 @@ export const publishPost = async (
 			return `<figure class="kg-card kg-embed-card"><div class="twitter-tweet twitter-tweet-rendered"><iframe src="${url}" width="550" height="550" frameborder="0" scrolling="no" allowfullscreen="true" style="border: none; max-width: 100%; min-width: 100%;"></iframe></div></figure>`;
 		}
 	)
-
-
-	
-
-
-		
-
-	/*
-   >\s([\s\S]*?)\((\[View Tweet\]\(https:\/\/twitter.com\/.*?\/status\/.*?\))\)
-	*/
 
 	// use the ghosts admin /post api to see if post with slug exists
 	const slugExistsRes = await request({
