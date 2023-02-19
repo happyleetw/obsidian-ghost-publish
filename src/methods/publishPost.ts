@@ -22,6 +22,39 @@ const contentPost = (frontmatter: ContentProp, data: DataProp) => ({
 	],
 });
 
+const replaceListsWithHTMLCard = (content: string) => {
+	// Ghost swallows the list for some reason, so we need to replace them with a HTML card
+
+	const list = content.match(/<ul>(.*)<\/ul>/s);
+	if (list) {
+		const htmlCard = `<!--kg-card-begin: html--><div class="kg-card-markdown">${list[0]}</div><!--kg-card-end: html-->`;
+		content = content.replace(/<ul>(.*)<\/ul>/s, htmlCard);
+	}
+
+	return content;
+};
+
+const replaceOrderedListsWithHTMLCard = (content: string) => {
+	// Ghost swallows the list for some reason, so we need to replace them with a HTML card
+
+	const list = content.match(/<ol>(.*)<\/ol>/s);
+	if (list) {
+		const htmlCard = `<!--kg-card-begin: html--><div class="kg-card-markdown">${list[0]}</div><!--kg-card-end: html-->`;
+		// ignore ol with class="footnotes-list"
+		content = content.replace(/<ol>(.*)<\/ol>/s, htmlCard);
+	}
+
+	return content;
+};
+
+// run all replacers on the content
+const replacer = (content: string) => {
+	content = replaceListsWithHTMLCard(content);
+	content = replaceOrderedListsWithHTMLCard(content);
+	content = replaceFootnotesWithHTMLCard(content);
+	return content;
+};
+
 const replaceFootnotesWithHTMLCard = (content: string) => {
 	// Ghost swallows the footnote links for some reason, so we need to replace them with a HTML card
 	/*
@@ -37,8 +70,6 @@ const replaceFootnotesWithHTMLCard = (content: string) => {
 
 	needs to be surrounded with `<!--kg-card-begin: html-->` and `<!--kg-card-end: html-->`
 	*/
-
-
 
 	const footnotes = content.match(
 		/<hr class="footnotes-sep">(.*)<\/section>/s
@@ -122,9 +153,6 @@ export const publishPost = async (
 						if (month < 10) {
 							month = `0${month}`;
 						}
-
-						console.log("year", year);
-						console.log("month", month);
 					} else {
 						// get the year
 						year = new Date().getFullYear();
@@ -150,6 +178,44 @@ export const publishPost = async (
 				} catch (err) {
 					console.log("is404Req", err);
 				}
+			} else if (
+				p1.toLowerCase().includes(".m4a") ||
+				p1.toLowerCase().includes(".mp3") ||
+				p1.toLowerCase().includes(".wav")
+			) {
+				let year;
+				let month;
+				if (frontmatter.imagesYear && frontmatter.imagesMonth) {
+					year = frontmatter.imagesYear;
+					month = frontmatter.imagesMonth;
+
+					if (month < 10) {
+						month = `0${month}`;
+					}
+				} else {
+					// get the year
+					year = new Date().getFullYear();
+					// get the month
+					const monthNum = new Date().getMonth() + 1;
+					month = monthNum.toString();
+					if (monthNum < 10) {
+						month = `0${monthNum}`;
+					}
+				}
+
+				return `<div class="kg-card kg-audio-card">
+				<div class="kg-audio-player-container"><audio src="${BASE_URL}/content/media/${year}/${month}/${p1
+					.replace(/ /g, "-")
+					.replace(
+						/%20/g,
+						"-"
+					)}"></audio><div class="kg-audio-title">${p1
+					.replace(".m4a", "")
+					.replace(".wav", "")
+					.replace(
+						".mp3",
+						""
+					)}</div></div></div>`;
 			}
 
 			const [link, text] = p1.split("|");
@@ -161,7 +227,10 @@ export const publishPost = async (
 		}
 	);
 
+
 	data.content = content;
+
+	console.log("data.content", data.content);
 
 	// remove the first h1 (# -> \n) in the content
 	data.content = data.content.replace(/#.*\n/, "");
@@ -192,6 +261,18 @@ export const publishPost = async (
 		}
 	);
 
+	// replace ```ad-summary ...``` with callout block
+	data.content = data.content.replace(
+		/```ad-summary([\S\s]*?)```/g,
+		(match: any, p1: string) => {
+			return `<div class="kg-card kg-callout-card kg-callout-card-gray"><div class="kg-callout-emoji">TL;DR</div><div class="kg-callout-text">${p1}</div></div>`;
+		}
+	);
+
+	/*
+		<div class="kg-card kg-callout-card kg-callout-card-purple"><div class="kg-callout-emoji">🖐️</div><div class="kg-callout-text">yo</div></div>
+	*/
+
 	const sendToGhost = true; // set to false to test locally
 
 	if (sendToGhost) {
@@ -219,10 +300,8 @@ export const publishPost = async (
 				JSON.parse(slugExistsRes).posts[0].updated_at;
 
 			const htmlContent = contentPost(frontmatter, data);
-			htmlContent.posts[0].html = replaceFootnotesWithHTMLCard(
-				htmlContent.posts[0].html
-			);
-			console.log("htmlContent", htmlContent);
+			htmlContent.posts[0].html = replacer(htmlContent.posts[0].html);
+			
 			// if slug exists, update the post
 			const result = await request({
 				url: `${settings.url}/ghost/api/${version}/admin/posts/${id}/?source=html`,
@@ -258,9 +337,7 @@ export const publishPost = async (
 			}
 		} else {
 			const htmlContent = contentPost(frontmatter, data);
-			htmlContent.posts[0].html = replaceFootnotesWithHTMLCard(
-				htmlContent.posts[0].html
-			);
+			htmlContent.posts[0].html = replacer(htmlContent.posts[0].html);
 			// upload post
 			const result = await request({
 				url: `${settings.url}/ghost/api/${version}/admin/posts/?source=html`,
