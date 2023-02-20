@@ -209,7 +209,7 @@ export const publishPost = async (
 					.replace(
 						/%20/g,
 						"-"
-					)}"></audio><div class="kg-audio-title">${p1
+					)}" preload="metadata"></audio><div class="kg-audio-title">${p1
 					.replace(".m4a", "")
 					.replace(".wav", "")
 					.replace(
