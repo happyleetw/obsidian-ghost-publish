@@ -2,10 +2,13 @@
 import { SettingsProp, ContentProp, DataProp } from "./../types/index";
 import { MarkdownView, Notice, request } from "obsidian";
 import { sign } from "jsonwebtoken";
+import { parse } from 'node-html-parser'; 
 
 const md_footnote = require("markdown-it-footnote");
 const matter = require("gray-matter");
 const MarkdownIt = require("markdown-it");
+
+const sendToGhost = true; // set to false to test locally
 
 const md = new MarkdownIt({
 	html: true,
@@ -25,32 +28,38 @@ const contentPost = (frontmatter: ContentProp, data: DataProp) => ({
 const replaceListsWithHTMLCard = (content: string) => {
 	// Ghost swallows the list for some reason, so we need to replace them with a HTML card
 
-	const list = content.match(/<ul>(.*)<\/ul>/s);
-	if (list) {
-		const htmlCard = `<!--kg-card-begin: html--><div class="kg-card-markdown">${list[0]}</div><!--kg-card-end: html-->`;
-		content = content.replace(/<ul>(.*)<\/ul>/s, htmlCard);
-	}
+	let parsedContent = parse(content);
+	// add font family var(--font-serif) to lists > li and replace content
+	const li = parsedContent.querySelectorAll('li').filter(li => {
+		return li.attributes.class !== 'footnotes-list';
+	});
+	li.forEach(li => {
+		li.setAttribute('style', 'font-family: var(--font-serif)');
+	});
 
-	return content;
-};
+	content = parsedContent.toString();
+	parsedContent = parse(content); // i couldnt think of a better way to do this lmao
 
-const replaceOrderedListsWithHTMLCard = (content: string) => {
-	// Ghost swallows the list for some reason, so we need to replace them with a HTML card
+	const lists = parsedContent.querySelectorAll('ul, ol').filter(list => {
+		return list.parentNode.tagName === null && list.attributes.class !== 'footnotes-list';
+	});
 
-	const list = content.match(/<ol>(.*)<\/ol>/s);
-	if (list) {
-		const htmlCard = `<!--kg-card-begin: html--><div class="kg-card-markdown">${list[0]}</div><!--kg-card-end: html-->`;
-		// ignore ol with class="footnotes-list"
-		content = content.replace(/<ol>(.*)<\/ol>/s, htmlCard);
-	}
+	// wrap list in HTML card const htmlCard = `<!--kg-card-begin: html--><div class="kg-card-markdown">${list[0]}</div><!--kg-card-end: html-->`;
+	lists.forEach(list => {
 
+		
+		const htmlCard = `<!--kg-card-begin: html--><div>${list.outerHTML}</div><!--kg-card-end: html-->`;
+		content = content.replace(list.outerHTML, htmlCard);
+	});
+
+	
+	
 	return content;
 };
 
 // run all replacers on the content
 const replacer = (content: string) => {
 	content = replaceListsWithHTMLCard(content);
-	content = replaceOrderedListsWithHTMLCard(content);
 	content = replaceFootnotesWithHTMLCard(content);
 	return content;
 };
@@ -123,7 +132,7 @@ export const publishPost = async (
 		featured: metaMatter?.featured || false,
 		slug: metaMatter?.slug || view.file.basename,
 		status: metaMatter?.published ? "published" : "draft",
-		excerpt: metaMatter?.excerpt || undefined,
+		custom_excerpt: metaMatter?.excerpt || undefined,
 		feature_image: metaMatter?.feature_image || undefined,
 		updated_at: metaMatter?.updated_at || undefined,
 		"date modified": metaMatter["date modified"] || undefined,
@@ -132,6 +141,11 @@ export const publishPost = async (
 	};
 
 	const BASE_URL = settings.baseURL;
+
+	if (frontmatter.custom_excerpt && frontmatter.custom_excerpt.length > 300) {
+		new Notice("Excerpt is too long. Max 300 characters.");
+		return;
+	}
 
 	// convert [[link]] to <a href="BASE_URL/id" class="link-previews">Internal Micro</a>for Ghost
 	const content = data.content.replace(
@@ -230,7 +244,7 @@ export const publishPost = async (
 
 	data.content = content;
 
-	console.log("data.content", data.content);
+	// console.log("data.content", data.content);
 
 	// remove the first h1 (# -> \n) in the content
 	data.content = data.content.replace(/#.*\n/, "");
@@ -273,7 +287,8 @@ export const publishPost = async (
 		<div class="kg-card kg-callout-card kg-callout-card-purple"><div class="kg-callout-emoji">🖐️</div><div class="kg-callout-text">yo</div></div>
 	*/
 
-	const sendToGhost = true; // set to false to test locally
+	const htmlContent = contentPost(frontmatter, data);
+			htmlContent.posts[0].html = replacer(htmlContent.posts[0].html);
 
 	if (sendToGhost) {
 		// use the ghosts admin /post api to see if post with slug exists
