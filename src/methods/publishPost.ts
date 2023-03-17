@@ -282,10 +282,16 @@ export const publishPost = async (
 			return `<div class="kg-card kg-callout-card kg-callout-card-gray"><div class="kg-callout-emoji">TL;DR</div><div class="kg-callout-text">${p1}</div></div>`;
 		}
 	);
-
-	/*
-		<div class="kg-card kg-callout-card kg-callout-card-purple"><div class="kg-callout-emoji">🖐️</div><div class="kg-callout-text">yo</div></div>
-	*/
+	
+	// fucking fail
+	// replace ```bookmark ...``` with callout block
+	// data.content = data.content.replace(
+	// 	/```bookmark([\S\s]*?)```/g,
+	// 	(match: any, p1: string) => {
+	// 		console.log("p1", p1);
+	// 		return `<figure class="kg-card kg-embed-card"><a href="${p1}">${p1}</a></div></figure>`;
+	// 	}
+	// );
 
 	const htmlContent = contentPost(frontmatter, data);
 			htmlContent.posts[0].html = replacer(htmlContent.posts[0].html);
