@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin } from "obsidian";
+import { MarkdownView, Notice, Plugin, TFile } from "obsidian";
 
 import { DEFAULT_SETTINGS, SettingsProp } from "./types/index";
 import { SettingTab } from "./settingTab";
@@ -37,6 +37,58 @@ export default class GhostPublish extends Plugin {
 				}
 
 				publishPost(view, this.settings);
+			},
+		});
+
+		this.addCommand({
+			id: "move-image-under-cursor",
+			name: "Move image under cursor",
+			editorCallback: async (editor, view: MarkdownView) => {
+				if (!view) {
+					new Notice("No active view");
+					return;
+				}
+
+				const cursorPos = editor.getCursor();
+				const lineText = editor.getLine(cursorPos.line);
+				const match = /!\[\[(.+)\]\]/.exec(lineText);
+
+				if (!match || !match[1]) {
+					console.error(
+						"No valid file link found at cursor position"
+					);
+					return;
+				}
+
+				const fileName = match[1];
+
+				try {
+					// Get abstract representation of source file based on its path
+					const sourceFilePath = `Private/Screenshots/${fileName}`;
+					const sourceFile: TFile | null =
+						(await this.app.vault.getAbstractFileByPath(
+							sourceFilePath
+						)) as TFile;
+
+					if (!sourceFile) {
+						console.error(`Could not find file ${fileName}`);
+						return;
+					}
+
+					// Move/rename the file by changing its parent folder
+					const newParentFolderName = "Attachments";
+
+					this.app.fileManager.renameFile(
+						sourceFile,
+						`${newParentFolderName}/${sourceFile.name}`
+					);
+
+					console.log(
+						`Successfully moved/renamed ${fileName} to ${newParentFolderName}/${sourceFile.name}`
+					);
+				} catch (error) {
+					console.error(error);
+				}
 			},
 		});
 
