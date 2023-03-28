@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, TFile } from "obsidian";
+import { MarkdownView, Notice, Plugin, TFile, App, Modal, Vault, Setting } from "obsidian";
 
 import { DEFAULT_SETTINGS, SettingsProp } from "./types/index";
 import { SettingTab } from "./settingTab";
@@ -64,7 +64,7 @@ export default class GhostPublish extends Plugin {
 
 				try {
 					// Get abstract representation of source file based on its path
-					const sourceFilePath = `Private/Screenshots/${fileName}`;
+					const sourceFilePath = `${this.settings.screenshotsFolder}/${fileName}`;
 					const sourceFile: TFile | null =
 						(await this.app.vault.getAbstractFileByPath(
 							sourceFilePath
@@ -76,15 +76,35 @@ export default class GhostPublish extends Plugin {
 					}
 
 					// Move/rename the file by changing its parent folder
-					const newParentFolderName = "Attachments";
+					const newParentFolderName = this.settings.attachmentsFolder;
+
+
+					let renamedFile = sourceFile.name;
+
+					const result = await renameFileModal(
+						this.app,
+						this.app.vault,
+						sourceFile.name
+					);
+
+					if (result) {
+						if (result !== sourceFile.name && result !== "") {
+							renamedFile = result;
+						}
+					} else {
+						return;
+					}
+
 
 					this.app.fileManager.renameFile(
 						sourceFile,
-						`${newParentFolderName}/${sourceFile.name}`
+						`${newParentFolderName}/${renamedFile}.png`
 					);
 
+
+
 					console.log(
-						`Successfully moved/renamed ${fileName} to ${newParentFolderName}/${sourceFile.name}`
+						`Successfully moved/renamed ${fileName} to ${newParentFolderName}/${renamedFile}.png`
 					);
 				} catch (error) {
 					console.error(error);
@@ -106,5 +126,79 @@ export default class GhostPublish extends Plugin {
 	}
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+}
+
+export const renameFileModal = async (
+	app: App,
+	vault: Vault,
+	fileName: string,
+) => {
+	const folderCreationModal = new FileRenameModal(
+		app,
+		fileName
+	);
+
+	folderCreationModal.open();
+	const result = await folderCreationModal.waitForModalValue();
+
+    return result;
+};
+
+class FileRenameModal extends Modal {
+	result: string;
+	fileName: string;
+	modalPromise: Promise<string>;
+	resolveModalPromise: (value: string) => void;
+
+	constructor(
+		app: App,
+		fileName: string
+	) {
+		super(app);
+
+		this.result = fileName;
+		this.modalPromise = new Promise((resolve) => {
+			this.resolveModalPromise = resolve;
+		});
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+
+		contentEl.createEl("h2", {
+			text: `Rename image`,
+		});
+
+        new Setting(contentEl).addText((text) =>
+			text
+				.setPlaceholder("File Name")
+				.setValue(this.fileName)
+				.onChange((value) => {
+					this.fileName = value;
+				})
+		);
+
+		new Setting(contentEl).addButton((btn) =>
+			btn
+				.setButtonText("Submit")
+				.setTooltip("Rename File")
+				.setCta()
+				.onClick(() => {
+					this.resolveModalPromise(this.fileName);
+					this.close();
+				})
+		);
+
+
+	}
+
+	waitForModalValue() {
+		return this.modalPromise;
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
 	}
 }

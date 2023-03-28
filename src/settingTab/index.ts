@@ -82,5 +82,33 @@ export class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Screenshots Folder")
+			.setDesc("Your screenshots folder e.g: /screenshots (no trailing slash)")
+			.addText((text) =>
+				text
+					.setPlaceholder("/screenshots")
+					.setValue(this.plugin.settings.screenshotsFolder)
+					.onChange(async (value) => {
+						console.log("Screenshots Folder: " + value);
+						this.plugin.settings.screenshotsFolder = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Attachments Folder")
+			.setDesc("Your attachments folder e.g: /attachments (no trailing slash)")
+			.addText((text) =>
+				text
+					.setPlaceholder("/attachments")
+					.setValue(this.plugin.settings.attachmentsFolder)
+					.onChange(async (value) => {
+						console.log("Attachments Folder: " + value);
+						this.plugin.settings.attachmentsFolder = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }

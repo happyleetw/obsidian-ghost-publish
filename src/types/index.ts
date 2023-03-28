@@ -2,11 +2,16 @@ export interface SettingsProp {
 	url: string;
 	adminToken: string;
 	baseURL: string;
+	screenshotsFolder: string;
+	attachmentsFolder: string;
 }
 
 export const DEFAULT_SETTINGS: SettingsProp = {
 	url: "",
 	adminToken: "",
+	baseURL: "",
+	screenshotsFolder: "Private/Screenshots",
+	attachmentsFolder: "Attachments",
 };
 
 export interface ContentProp {
