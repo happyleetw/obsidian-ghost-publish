@@ -112,6 +112,53 @@ export default class GhostPublish extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "replace roles with names",
+			name: "Replace roles with names",
+			editorCallback: async (editor, view: MarkdownView) => {
+				const selection = editor.getSelection();
+				const replaced = selection.replace(/role::assistant/g, "**GPT:**").replace(/role::user/g, "**Bram:**");
+
+				/*
+				---
+				title: "Test"
+				---
+
+				post
+
+				converted to
+
+				```
+				---
+				title: "Test"
+				---
+				```
+				post
+				*/
+
+
+				const surroundYAMLWithBackticks = (text: string) => {
+					const lines = text.split("\n");
+					const yamlLines = [];
+					let yaml = false;
+					for (const line of lines) {
+						if (line.startsWith("---")) {
+							yaml = !yaml;
+						}
+						if (yaml) {
+							yamlLines.push(line);
+						}
+					}
+					if (yamlLines.length > 0) {
+						return "```\n" + yamlLines.join("\n") + "\n---\n```\n" + text.replace(yamlLines.join("\n") + "\n---", "");
+					}
+					return text;
+				}
+					
+				editor.replaceSelection(surroundYAMLWithBackticks(replaced));
+			},
+		})
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SettingTab(this.app, this));
 	}
