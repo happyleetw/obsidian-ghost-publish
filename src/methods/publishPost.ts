@@ -61,6 +61,16 @@ const replaceListsWithHTMLCard = (content: string) => {
 const replacer = (content: string) => {
 	content = replaceListsWithHTMLCard(content);
 	content = replaceFootnotesWithHTMLCard(content);
+	// const replaceYellowCallout = (content: string) => {
+	// 	// replace kg-callout-card-#F1F3F4 with kg-callout-card-yellow
+	// 	content = content.replace(
+	// 		/kg-callout-card-#F1F3F4/g,
+	// 		"kg-callout-card-yellow"
+	// 	);
+	// 	return content;
+	// }
+	// content = replaceYellowCallout(content); // not working -- need to manually replace on the ghost side
+	console.log(content);
 	return content;
 };
 
@@ -147,56 +157,14 @@ export const publishPost = async (
 		return;
 	}
 
-	// convert [[link]] to <a href="BASE_URL/id" class="link-previews">Internal Micro</a>for Ghost
-	const content = data.content.replace(
-		/!*\[\[(.*?)\]\]/g,
-		(match: any, p1: string) => {
-			if (
-				p1.toLowerCase().includes(".png") ||
-				p1.toLowerCase().includes(".jpg") ||
-				p1.toLowerCase().includes(".jpeg") ||
-				p1.toLowerCase().includes(".gif")
-			) {
-				try {
-					let year;
-					let month;
-					if (frontmatter.imagesYear && frontmatter.imagesMonth) {
-						year = frontmatter.imagesYear;
-						month = frontmatter.imagesMonth;
-
-						if (month < 10) {
-							month = `0${month}`;
-						}
-					} else {
-						// get the year
-						year = new Date().getFullYear();
-						// get the month
-						const monthNum = new Date().getMonth() + 1;
-						month = monthNum.toString();
-						if (monthNum < 10) {
-							month = `0${monthNum}`;
-						}
-					}
-
-					return `<figure class="kg-card kg-image-card"><img src="${BASE_URL}/content/images/${year}/${month}/${p1
-						.replace(/ /g, "-")
-						.replace(
-							/%20/g,
-							"-"
-						)}" alt="${BASE_URL}/content/images/${year}/${month}/${p1
-						.replace(/ /g, "-")
-						.replace(
-							/%20/g,
-							"-"
-						)}"></img><figcaption>${p1}</figcaption></figure>`;
-				} catch (err) {
-					console.log("is404Req", err);
-				}
-			} else if (
-				p1.toLowerCase().includes(".m4a") ||
-				p1.toLowerCase().includes(".mp3") ||
-				p1.toLowerCase().includes(".wav")
-			) {
+	const wikiLinkReplacer = (match: any, p1: string) => {
+		if (
+			p1.toLowerCase().includes(".png") ||
+			p1.toLowerCase().includes(".jpg") ||
+			p1.toLowerCase().includes(".jpeg") ||
+			p1.toLowerCase().includes(".gif")
+		) {
+			try {
 				let year;
 				let month;
 				if (frontmatter.imagesYear && frontmatter.imagesMonth) {
@@ -217,28 +185,72 @@ export const publishPost = async (
 					}
 				}
 
-				return `<div class="kg-card kg-audio-card">
-				<div class="kg-audio-player-container"><audio src="${BASE_URL}/content/media/${year}/${month}/${p1
+				return `<figure class="kg-card kg-image-card"><img src="${BASE_URL}/content/images/${year}/${month}/${p1
 					.replace(/ /g, "-")
 					.replace(
 						/%20/g,
 						"-"
-					)}" preload="metadata"></audio><div class="kg-audio-title">${p1
-					.replace(".m4a", "")
-					.replace(".wav", "")
+					)}" alt="${BASE_URL}/content/images/${year}/${month}/${p1
+					.replace(/ /g, "-")
 					.replace(
-						".mp3",
-						""
-					)}</div></div></div>`;
+						/%20/g,
+						"-"
+					)}"></img><figcaption>${p1}</figcaption></figure>`;
+			} catch (err) {
+				console.log("is404Req", err);
+			}
+		} else if (
+			p1.toLowerCase().includes(".m4a") ||
+			p1.toLowerCase().includes(".mp3") ||
+			p1.toLowerCase().includes(".wav")
+		) {
+			let year;
+			let month;
+			if (frontmatter.imagesYear && frontmatter.imagesMonth) {
+				year = frontmatter.imagesYear;
+				month = frontmatter.imagesMonth;
+
+				if (month < 10) {
+					month = `0${month}`;
+				}
+			} else {
+				// get the year
+				year = new Date().getFullYear();
+				// get the month
+				const monthNum = new Date().getMonth() + 1;
+				month = monthNum.toString();
+				if (monthNum < 10) {
+					month = `0${monthNum}`;
+				}
 			}
 
-			const [link, text] = p1.split("|");
-			const [id, slug] = link.split("#");
-			const url = `${BASE_URL}/${id}`;
-			const linkText = text || slug || link;
-			const linkHTML = `<a href="${url}">${linkText}</a>`;
-			return linkHTML;
+			return `<div class="kg-card kg-audio-card">
+			<div class="kg-audio-player-container"><audio src="${BASE_URL}/content/media/${year}/${month}/${p1
+				.replace(/ /g, "-")
+				.replace(
+					/%20/g,
+					"-"
+				)}" preload="metadata"></audio><div class="kg-audio-title">${p1
+				.replace(".m4a", "")
+				.replace(".wav", "")
+				.replace(
+					".mp3",
+					""
+				)}</div></div></div>`;
 		}
+
+		const [link, text] = p1.split("|");
+		const [id, slug] = link.split("#");
+		const url = `${BASE_URL}/${id}`;
+		const linkText = text || slug || link;
+		const linkHTML = `<a href="${url}">${linkText}</a>`;
+		return linkHTML;
+	}
+
+	// convert [[link]] to <a href="BASE_URL/id" class="link-previews">Internal Micro</a>for Ghost
+	const content = data.content.replace(
+		/!*\[\[(.*?)\]\]/g,
+		wikiLinkReplacer
 	);
 
 
@@ -280,6 +292,29 @@ export const publishPost = async (
 		/```ad-summary([\S\s]*?)```/g,
 		(match: any, p1: string) => {
 			return `<div class="kg-card kg-callout-card kg-callout-card-gray"><div class="kg-callout-emoji">TL;DR</div><div class="kg-callout-text">${p1}</div></div>`;
+		}
+	);
+
+	// replace =begin-chatgpt-md-comment to =end-chatgpt-md-comment with callout block
+	data.content = data.content.replace(
+		/=begin-chatgpt-md-comment([\S\s]*?)=end-chatgpt-md-comment/g,
+		(match: any, p1: string) => {
+			const p1HrefLink = p1.replace(
+				/(\[.*?\])(\(.*?\))/g,
+				(match: any, p1: string, p2: string) => {
+					return `<a href="${p2.replace(
+						/[\(\)]/g,
+						""
+					)}">${p1.slice(1,-1)}</a>`;
+				}
+			);
+
+			const p1WikiLink = p1HrefLink.replace(
+				/!*\[\[(.*?)\]\]/g,
+				wikiLinkReplacer
+			);
+
+			return `<div class="kg-card kg-callout-card-yellow"><div class="kg-callout-emoji">💡</div><div class="kg-callout-text">${p1WikiLink}</div></div>`;
 		}
 	);
 	
