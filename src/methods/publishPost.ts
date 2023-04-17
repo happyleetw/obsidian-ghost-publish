@@ -69,7 +69,7 @@ const replacer = (content: string) => {
 	// 	);
 	// 	return content;
 	// }
-	// content = replaceYellowCallout(content); // not working -- need to manually replace on the ghost side
+	// content = replaceYellowCallout(content);
 	console.log(content);
 	return content;
 };
@@ -314,7 +314,7 @@ export const publishPost = async (
 				wikiLinkReplacer
 			);
 
-			return `<div class="kg-card kg-callout-card-yellow"><div class="kg-callout-emoji">💡</div><div class="kg-callout-text">${p1WikiLink}</div></div>`;
+			return `<div class="kg-card kg-callout-card-yellow kg-callout-card"><div class="kg-callout-card-yellow"><div class="kg-callout-emoji">💡</div><div class="kg-callout-text">${p1WikiLink}</div></div></div>`; // color does not work ghost ruins it for some reason
 		}
 	);
 	
