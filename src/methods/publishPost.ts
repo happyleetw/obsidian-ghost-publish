@@ -241,8 +241,16 @@ export const publishPost = async (
 
 		const [link, text] = p1.split("|");
 		const [id, slug] = link.split("#");
-		const url = `${BASE_URL}/${id}`;
-		const linkText = text || slug || link;
+
+		// Get frontmatter of the linked note
+		const linkedNote = app.metadataCache.getFirstLinkpathDest(id, noteFile.path);
+		const linkedNoteMeta = app.metadataCache.getFileCache(linkedNote)?.frontmatter;
+
+		// Get slug from frontmatter
+		const linkedNoteSlug = linkedNoteMeta?.slug;
+
+		const url = `${BASE_URL}/${linkedNoteSlug || slug || id}`;
+		const linkText = text || id || slug;
 		const linkHTML = `<a href="${url}">${linkText}</a>`;
 		return linkHTML;
 	}
