@@ -295,6 +295,17 @@ export const publishPost = async (
 		}
 	);
 
+	// replace ==highlight== with highlight span
+	data.content = data.content.replace(
+		/==([\S\s]*?)==/g,
+		(match: any, p1: string) => {
+			return `<b>${p1}</b>`;
+		}
+	);
+
+	console.log("data.content", data.content);
+
+
 	// replace ```ad-summary ...``` with callout block
 	data.content = data.content.replace(
 		/```ad-summary([\S\s]*?)```/g,
