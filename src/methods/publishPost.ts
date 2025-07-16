@@ -57,10 +57,39 @@ const replaceListsWithHTMLCard = (content: string) => {
 	return content;
 };
 
+const replaceVideoWithHTMLCard = (content: string) => {
+	// 使用 node-html-parser 解析內容，類似列表處理的方式
+	let parsedContent = parse(content);
+	
+	// 找到所有 video 元素
+	const videos = parsedContent.querySelectorAll('video');
+	
+	console.log('Found videos:', videos.length);
+	
+	videos.forEach(video => {
+		console.log('Processing video:', video.outerHTML);
+		
+		// 檢查是否已經被包裝在 HTML card 中
+		const parent = video.parentNode;
+		if (parent && parent.tagName === 'div' && parent.outerHTML.includes('<!--kg-card-begin: html-->')) {
+			console.log('Video already wrapped, skipping');
+			return; // 已經處理過了
+		}
+		
+		// 包裝 video 元素在 HTML card 中
+		const htmlCard = `<!--kg-card-begin: html--><div>${video.outerHTML}</div><!--kg-card-end: html-->`;
+		console.log('Replacing with:', htmlCard);
+		content = content.replace(video.outerHTML, htmlCard);
+	});
+	
+	return content;
+};
+
 // run all replacers on the content
 const replacer = (content: string) => {
 	content = replaceListsWithHTMLCard(content);
 	content = replaceFootnotesWithHTMLCard(content);
+	content = replaceVideoWithHTMLCard(content);
 	// const replaceYellowCallout = (content: string) => {
 	// 	// replace kg-callout-card-#F1F3F4 with kg-callout-card-yellow
 	// 	content = content.replace(
@@ -73,8 +102,6 @@ const replacer = (content: string) => {
 	console.log(content);
 	return content;
 };
-
-
 
 const replaceFootnotesWithHTMLCard = (content: string) => {
 	// Ghost swallows the footnote links for some reason, so we need to replace them with a HTML card
@@ -267,16 +294,20 @@ export const publishPost = async (
 	// 修正為只移除單一 # 開頭的標題
 	data.content = data.content.replace(/^# .*(\n|$)/, "");
 
+	// 在 markdown 轉 HTML 之前先處理影片，避免被包裝在 <p> 標籤中
+	data.content = data.content.replace(
+		/!\[([^\]]*)\]\(([^)]+\.(mov|mp4|avi|wmv|flv|webm|mkv|m4v|3gp|ogv))\)/gi,
+		(match: any, alt: string, url: string) => {
+			return `<!--kg-card-begin: html--><div><video class="video-js" autoplay loop muted playsinline controls="false" data-setup="{}"><source src="${url}" type="video/mp4" /></video></div><!--kg-card-end: html-->`;
+		}
+	);
+
 	// 處理外部圖片嵌入 ![](https://xxx.com)
 	data.content = data.content.replace(
 		/!\[([^\]]*)\]\(([^)]+)\)/g,
 		(match: any, alt: string, url: string) => {
 			// 檢查是否為圖片格式
 			if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
-				return `<figure class="kg-card kg-image-card"><img src="${url}" class="kg-image" alt="${alt || ''}" loading="lazy"></figure>`;
-			}
-			// 檢查是否為影片格式
-			else if (url.match(/\.(mov|mp4|avi|wmv|flv|webm|mkv|m4v|3gp|ogv)$/i)) {
 				return `<figure class="kg-card kg-image-card"><img src="${url}" class="kg-image" alt="${alt || ''}" loading="lazy"></figure>`;
 			}
 			// 檢查是否為 YouTube 連結
