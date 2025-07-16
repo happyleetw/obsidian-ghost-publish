@@ -74,6 +74,8 @@ const replacer = (content: string) => {
 	return content;
 };
 
+
+
 const replaceFootnotesWithHTMLCard = (content: string) => {
 	// Ghost swallows the footnote links for some reason, so we need to replace them with a HTML card
 	/*
@@ -91,12 +93,12 @@ const replaceFootnotesWithHTMLCard = (content: string) => {
 	*/
 
 	const footnotes = content.match(
-		/<hr class="footnotes-sep">(.*)<\/section>/s
+		/<hr class="footnotes-sep">([\s\S]*)<\/section>/
 	);
 	if (footnotes) {
 		const htmlCard = `<!--kg-card-begin: html--><div class="kg-card-markdown">${footnotes[0]}</div><!--kg-card-end: html-->`;
 		content = content.replace(
-			/<hr class="footnotes-sep">(.*)<\/section>/s,
+			/<hr class="footnotes-sep">([\s\S]*)<\/section>/,
 			htmlCard
 		);
 
@@ -190,12 +192,7 @@ export const publishPost = async (
 					.replace(
 						/%20/g,
 						"-"
-					)}" alt="${BASE_URL}/content/images/${year}/${month}/${p1
-					.replace(/ /g, "-")
-					.replace(
-						/%20/g,
-						"-"
-					)}"></img><figcaption>${p1}</figcaption></figure>`;
+					)}" class="kg-image" alt="${p1}" loading="lazy"></figure>`;
 			} catch (err) {
 				console.log("is404Req", err);
 			}
@@ -267,15 +264,33 @@ export const publishPost = async (
 	// console.log("data.content", data.content);
 
 	// remove the first h1 (# -> \n) in the content
-	data.content = data.content.replace(/#.*\n/, "");
+	// 修正為只移除單一 # 開頭的標題
+	data.content = data.content.replace(/^# .*(\n|$)/, "");
 
-	// convert youtube embeds to ghost embeds
+	// 處理外部圖片嵌入 ![](https://xxx.com)
 	data.content = data.content.replace(
-		/<iframe.*src="https:\/\/www.youtube.com\/embed\/(.*?)".*<\/iframe>/g,
-		(match: any, p1: string) => {
-			return `<figure class="kg-card kg-embed-card"><div class="kg-embed-card"><iframe width="560" height="315" src="https://www.youtube.com/embed/${p1}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div></figure>`;
+		/!\[([^\]]*)\]\(([^)]+)\)/g,
+		(match: any, alt: string, url: string) => {
+			// 檢查是否為圖片格式
+			if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
+				return `<figure class="kg-card kg-image-card"><img src="${url}" class="kg-image" alt="${alt || ''}" loading="lazy"></figure>`;
+			}
+			// 檢查是否為影片格式
+			else if (url.match(/\.(mov|mp4|avi|wmv|flv|webm|mkv|m4v|3gp|ogv)$/i)) {
+				return `<figure class="kg-card kg-image-card"><img src="${url}" class="kg-image" alt="${alt || ''}" loading="lazy"></figure>`;
+			}
+			// 檢查是否為 YouTube 連結
+			else if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+				const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
+				if (videoId) {
+					return `<figure class="kg-card kg-embed-card"><iframe width="200" height="113" src="https://www.youtube.com/embed/${videoId}?feature=oembed" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" title="YouTube video"></iframe></figure>`;
+				}
+			}
+			// 其他格式保持原樣
+			return match;
 		}
 	);
+
 
 	// take the url from view tweet format and replace the entire blockquote with a tweet embed iframe
 	// add a new line before every ([View Tweet]
